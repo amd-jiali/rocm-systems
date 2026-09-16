@@ -145,7 +145,7 @@ static ncclResult_t postTuneP2pChannelBase(struct ncclComm* comm, int peer, bool
   while (peer != (isSendNotRecv ? comm->p2pSchedule[round].sendRank : comm->p2pSchedule[round].recvRank)) {
     round += 1;
   }
-  *baseOut = ncclP2pChannelBaseForRound(comm, round);
+  *baseOut = ncclP2pChannelBaseForRound(comm, round, rcclEffectiveP2pBatchEnable(comm));
   return ncclSuccess;
 }
 

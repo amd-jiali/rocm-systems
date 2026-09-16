@@ -1247,7 +1247,7 @@ NCCL_PARAM(ChunkSize, "CHUNK_SIZE", 0);
 RCCL_PARAM(P2pBatchEnable, "P2P_BATCH_ENABLE", -1);
 RCCL_PARAM(P2pBatchThreshold, "P2P_BATCH_THRESHOLD", 1 << 16); // 64k per-rank message size
 
-static int rcclEffectiveP2pBatchEnable(struct ncclComm* comm) {
+int rcclEffectiveP2pBatchEnable(struct ncclComm* comm) {
   auto userInput = rcclParamP2pBatchEnable();
   if (userInput >= 0) return userInput;
   if (comm->nNodes <= 1) return 0;
@@ -1282,7 +1282,11 @@ static ncclResult_t addP2pToPlan(struct ncclComm* comm, struct ncclKernelPlan* p
   void** handles[2] = {NULL, NULL};
   uint64_t p2pDirChannelMask[2] = {0, 0}; // per-direction channels (idx 0 recv, 1 send)
   bool batchP2P = rcclP2pBatchEligible(comm, sendBytes, recvBytes);
-  uint8_t base = ncclP2pChannelBaseForRound(comm, p2pRound, batchP2P);
+  // Keep work-fusion size-gated (batchP2P) but select the channel map from the
+  // communicator flag. Keying the map to eligibility collapsed large AllToAll
+  // onto the flags-off layout and forced a dual pre-connect. Channel base must
+  // also match task_posttuning / init, which have no per-op size.
+  uint8_t base = ncclP2pChannelBaseForRound(comm, p2pRound, rcclEffectiveP2pBatchEnable(comm));
   struct ncclProxyOp proxyOps[2] = {};
   int nProxyOps = selfSend ? 0 : 2;
   // Latency-bound send/recv uses one of two separately-generated kernel variants:
@@ -3566,14 +3570,8 @@ static ncclResult_t p2pTaskAppend(struct ncclComm* comm, struct ncclInfo* info, 
       while (peer != (isSendNotRecv ? comm->p2pSchedule[round].sendRank : comm->p2pSchedule[round].recvRank)) {
         round += 1;
       }
-      // A communicator can execute both small, batch-eligible P2P operations and
-      // larger operations over its lifetime. Pre-connect both channel layouts
-      // when batching is enabled so planning can select by message size without
-      // depending on whichever size happened to be enqueued first.
-      const int baseModeCount = rcclEffectiveP2pBatchEnable(comm) ? 2 : 1;
-      for (int baseMode = 0; baseMode < baseModeCount; baseMode++) {
-        uint8_t base = ncclP2pChannelBaseForRound(comm, round, baseMode);
-        for (int c = 0; c < comm->p2pnChannelsPerPeer; c++) {
+      uint8_t base = ncclP2pChannelBaseForRound(comm, round, rcclEffectiveP2pBatchEnable(comm));
+      for (int c = 0; c < comm->p2pnChannelsPerPeer; c++) {
           int channelId = ncclP2pChannelForPart(comm->p2pnChannels, base, c, comm->p2pnChannelsPerPeer, comm->nNodes,
                                                 comm->p2pChannelShiftSize);
           if (isSendNotRecv) {
@@ -3614,7 +3612,6 @@ static ncclResult_t p2pTaskAppend(struct ncclComm* comm, struct ncclInfo* info, 
           }
         }
       }
-    }
   }
   ncclProfilerStopP2pApiEvent();
   return ncclSuccess;

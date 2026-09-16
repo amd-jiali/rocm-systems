@@ -2498,8 +2498,9 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, struct ncclComm* p
         int sendRound = 0, recvRound = 0;
         while (comm->p2pSchedule[sendRound].sendRank != peer) sendRound++;
         while (comm->p2pSchedule[recvRound].recvRank != peer) recvRound++;
-        uint8_t sendBase = ncclP2pChannelBaseForRound(comm, sendRound);
-        uint8_t recvBase = ncclP2pChannelBaseForRound(comm, recvRound);
+        int p2pBatchEnable = rcclEffectiveP2pBatchEnable(comm);
+        uint8_t sendBase = ncclP2pChannelBaseForRound(comm, sendRound, p2pBatchEnable);
+        uint8_t recvBase = ncclP2pChannelBaseForRound(comm, recvRound, p2pBatchEnable);
         for (int c = 0; c < comm->p2pnChannelsPerPeer; c++) {
           int channelId;
           channelId = ncclP2pChannelForPart(comm->p2pnChannels, sendBase, c, comm->p2pnChannelsPerPeer, comm->nNodes,
