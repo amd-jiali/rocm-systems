@@ -23,9 +23,13 @@ This is late contiguous VMM, not a 256 MiB-message reject.
 
 ## Run
 
-Build `rccl-UnitTestsMPI` (`ENABLE_MPI_TESTS=ON`, `GPU_TARGETS=gfx950`) then:
+Must be submitted from the **checkout root** (the directory that contains
+`projects/rccl`). Slurm copies the batch file, so `BASH_SOURCE` is not the
+repo; the script uses `SLURM_SUBMIT_DIR`.
 
 ```bash
+cd /path/to/nccl-sync-v2-31   # repo root, not projects/rccl
+git checkout users/jialili/ce-ar-512mib-staging-repro
 sbatch projects/rccl/tools/scripts/repro_ce_ar_512mib_staging_oom.sh
 ```
 

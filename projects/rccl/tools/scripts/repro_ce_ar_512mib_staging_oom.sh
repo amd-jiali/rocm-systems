@@ -18,9 +18,21 @@ conda activate rcclx
 module load rocm/7.0.2.2
 export ROCM_PATH=/opt/COE_modules/rocm/rocm-7.0.2.2
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-RDIR=$(cd "$SCRIPT_DIR/../.." && pwd)
-WT=$(cd "$RDIR/../.." && pwd)
+# sbatch copies this file into Slurm's spool, so BASH_SOURCE is not the repo.
+# Submit from the rocm-systems / nccl-sync checkout root:
+#   git checkout users/jialili/ce-ar-512mib-staging-repro
+#   sbatch projects/rccl/tools/scripts/repro_ce_ar_512mib_staging_oom.sh
+if [ -n "${SLURM_SUBMIT_DIR:-}" ] && [ -d "$SLURM_SUBMIT_DIR/projects/rccl" ]; then
+  WT=$SLURM_SUBMIT_DIR
+elif git rev-parse --show-toplevel >/dev/null 2>&1; then
+  WT=$(git rev-parse --show-toplevel)
+elif [ -d "$HOME/nccl-sync-v2-31/projects/rccl" ]; then
+  WT=$HOME/nccl-sync-v2-31
+else
+  echo "Cannot find repo root (sbatch from the checkout that contains projects/rccl)" >&2
+  exit 1
+fi
+RDIR=$WT/projects/rccl
 BDIR=${BDIR:-$RDIR/build/utfix}
 MPI_PATH=${MPI_PATH:-$HOME/mpich/install}
 OUT=$HOME/logs/nccl-sync-v2-31/ce-ar-oom/${SLURM_JOB_ID:-manual}
