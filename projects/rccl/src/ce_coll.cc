@@ -114,6 +114,8 @@ NCCL_PARAM(HierCeCollNumCtx, "HIER_CE_COLL_NUM_CTX", -1);
 
 // Decide multicast vs unicast for CE AllGather: a CE-only tuning mask lets
 // ncclTuningCompute pick the fastest CE method (UC vs MC).
+static ncclResult_t ncclCeEnsureAllReduceStaging(struct ncclComm* comm);
+
 int ncclCeAllGatherUseMulticast(struct ncclComm* comm, size_t perRankBytes, int captured, int inPlace) {
   if (!comm->symkState.hasLsaMultimem) return 0;
 
@@ -213,8 +215,8 @@ ncclResult_t ncclCeInit(struct ncclComm* comm) {
     }
   }
 
-  // AllReduce staging is allocated lazily in ncclCeEnsureAllReduceStaging so
-  // CE AllGather/AlltoAll/Scatter/Gather do not reserve hundreds of MiB of VMM.
+  // REPRO: allocate 512 MiB CE AllReduce staging during CE init (develop behavior).
+  NCCLCHECKGOTO(ncclCeEnsureAllReduceStaging(comm), ret, fail);
 
 exit:
   return ret;

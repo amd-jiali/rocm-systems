@@ -35,8 +35,10 @@
 #endif
 
 // Per-rank staging capacity in ceARTmpBuf.
+// REPRO branch: size slots from the 256 MiB eligibility cap so CE init
+// always reserves 2 x 256 MiB = 512 MiB (see docs/repro-ce-ar-512mib-staging-oom.md).
 inline size_t ncclCeAllReduceMaxChunkBytes(int nRanks) {
-  return (size_t)NCCL_CE_AR_STAGING_BYTES / (size_t)nRanks;
+  return (size_t)NCCL_CE_AR_MAX_MSG_BYTES / (size_t)nRanks;
 }
 
 // Per-rank slot size in ceARTmpBuf. The host scatter addresses slots in bytes
